@@ -939,6 +939,7 @@ function updateLegend() {
       <div class="legend-item"><div class="legend-dot" style="background:var(--node-highlight)"></div>Found</div>`;
   }
 }
+
 // ============================================================
 // KEYBOARD
 // ============================================================
