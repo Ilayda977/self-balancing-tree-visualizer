@@ -197,10 +197,10 @@
     <svg id="tree-svg"></svg>
 
     <div class="legend" id="legend">
-      <div class="legend-item"><div class="legend-dot" style="background:var(--node-new);color:var(--node-new)"></div>New node</div>
-      <div class="legend-item"><div class="legend-dot" style="background:var(--node-rot);color:var(--node-rot)"></div>Rotating</div>
-      <div class="legend-item"><div class="legend-dot" style="background:var(--node-path);color:var(--node-path)"></div>Search path</div>
-      <div class="legend-item"><div class="legend-dot" style="background:var(--node-found);color:var(--node-found)"></div>Found</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--node-new)"></div>New node</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--node-rot)"></div>Rotating</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--node-path)"></div>Search path</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--node-found)"></div>Found</div>
     </div>
 
     <div class="step-overlay" id="step-overlay">
@@ -219,24 +219,24 @@
         <span class="tab-label">Pseudo</span>
       </button>
       <button class="right-tab-btn" id="rtab-bigo" onclick="toggleRightPanel('bigo')" title="Big O Complexity">
-  <span>📊</span>
-  <span class="tab-label">Big O</span>
-</button>
-      <button class="right-tab-btn" id="rtab-chat" onclick="toggleRightPanel('chat')" title="Sohbet Geçmişi">
+        <span>📊</span>
+        <span class="tab-label">Big O</span>
+      </button>
+      <button class="right-tab-btn" id="rtab-chat" onclick="toggleRightPanel('chat')" title="Sohbet">
         <span>💬</span>
         <span class="tab-label">Sohbet</span>
       </button>
       <button class="right-tab-btn" id="rtab-history" onclick="toggleRightPanel('history')" title="Tree History">
-  <span>🕰️</span>
-  <span class="tab-label">History</span>
-</button>
+        <span>🕰️</span>
+        <span class="tab-label">History</span>
+      </button>
     </div>
 
     <!-- Panel Content -->
     <div class="right-panel-content" id="right-panel-content">
       <div class="right-panel-inner">
 
-        <!-- Pseudo-code Panel -->
+        <!-- ── Pseudo-code Panel ── -->
         <div class="pseudo-panel" id="pseudo-panel">
           <div class="panel-header">
             <div class="panel-title">
@@ -244,52 +244,26 @@
               <span class="panel-badge" id="pseudo-tree-badge">AVL</span>
             </div>
           </div>
-          <div class="pseudo-code-area" id="pseudo-code-area">
-            <!-- Lines injected by JS -->
-          </div>
-          <div class="complexity-bar" id="complexity-bar">
-            <!-- Complexities injected by JS -->
-          </div>
+          <div class="pseudo-code-area" id="pseudo-code-area"></div>
+          <div class="complexity-bar" id="complexity-bar"></div>
         </div>
-        <!-- Big O Panel -->
-<div class="bigo-panel" id="bigo-panel">
-  <div class="panel-header">
-    <div class="panel-title">
-      📊 Big O
-      <span class="panel-badge" id="bigo-tree-badge">Complexity</span>
-    </div>
-  </div>
-  <div class="bigo-scroll" id="bigo-area">
-    <!-- Injected by JS -->
-  </div>
-</div>
 
-        <!-- Chat Panel -->
-        <div class="chat-panel" id="chat-panel">
+        <!-- ── Big O Panel ── -->
+        <div class="bigo-panel" id="bigo-panel">
           <div class="panel-header">
             <div class="panel-title">
-              💬 Sohbet Geçmişi
+              📊 Big O
+              <span class="panel-badge" id="bigo-tree-badge">Complexity</span>
             </div>
           </div>
-          <!-- History Panel -->
-<div class="history-panel" id="history-panel">
-  <div class="panel-header">
-    <div class="panel-title">
-      🕰️ Tree History
-      <span class="panel-badge">Snapshots</span>
-    </div>
-  </div>
-  <div class="history-toolbar">
-    <button class="history-toolbar-btn save-now" onclick="saveSnapshot()">📌 Kaydet</button>
-    <button class="history-toolbar-btn clear-all" onclick="clearAllHistory()">🗑 Temizle</button>
-  </div>
-  <div class="history-count" id="history-count">0 snapshot</div>
-  <div class="history-scroll" id="history-area">
-    <!-- Injected by JS -->
-  </div>
-</div>
+          <div class="bigo-scroll" id="bigo-area"></div>
+        </div>
 
-          <!-- Auth wall (shown when not logged in) -->
+        <!-- ── Chat Panel ── -->
+        <div class="chat-panel" id="chat-panel">
+          <div class="panel-header">
+            <div class="panel-title">💬 Sohbet Geçmişi</div>
+          </div>
           <div class="chat-auth-wall" id="chat-auth-wall">
             <div class="auth-wall-icon">🔒</div>
             <div class="auth-wall-title">Giriş Gerekiyor</div>
@@ -299,12 +273,8 @@
               <button class="btn btn-secondary btn-full" onclick="openAuthModal('register')">Kayıt Ol</button>
             </div>
           </div>
-
-          <!-- Chat content (shown when logged in) -->
-          <div id="chat-logged-in" style="display:none;flex-direction:column;flex:1;overflow:hidden;display:none">
-            <div class="chat-messages" id="chat-messages">
-              <!-- Messages injected by JS -->
-            </div>
+          <div id="chat-logged-in" style="display:none;flex-direction:column;flex:1;overflow:hidden">
+            <div class="chat-messages" id="chat-messages"></div>
             <div class="chat-input-area">
               <textarea class="chat-input" id="chat-input" placeholder="Bir soru sorun…" rows="1"
                 onkeydown="chatKeyDown(event)"></textarea>
@@ -313,8 +283,24 @@
           </div>
         </div>
 
-      </div>
-    </div>
+        <!-- ── History Panel ── -->
+        <div class="history-panel" id="history-panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              🕰️ Tree History
+              <span class="panel-badge">Snapshots</span>
+            </div>
+          </div>
+          <div class="history-toolbar">
+            <button class="history-toolbar-btn save-now" onclick="saveSnapshot()">📌 Kaydet</button>
+            <button class="history-toolbar-btn clear-all" onclick="clearAllHistory()">🗑 Temizle</button>
+          </div>
+          <div class="history-count" id="history-count">0 snapshot</div>
+          <div class="history-scroll" id="history-area"></div>
+        </div>
+
+      </div><!-- /right-panel-inner -->
+    </div><!-- /right-panel-content -->
   </div><!-- /right-panel-wrapper -->
 
 </div><!-- /main -->
