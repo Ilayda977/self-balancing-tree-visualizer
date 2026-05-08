@@ -32,18 +32,14 @@ function applyTheme(t) {
 // AUTH SYSTEM (localStorage-based demo)
 // ============================================================
 let currentUser = null;
-let chatHistory = {}; // { username: [ {role, text, ts} ] }
-let modalMode   = 'login'; // 'login' | 'register'
+let chatHistory = {};
+let modalMode   = 'login';
 
 function initAuth() {
   const saved = localStorage.getItem('tv-user');
-  if (saved) {
-    try { currentUser = JSON.parse(saved); } catch(e) {}
-  }
+  if (saved) { try { currentUser = JSON.parse(saved); } catch(e) {} }
   const savedChats = localStorage.getItem('tv-chats');
-  if (savedChats) {
-    try { chatHistory = JSON.parse(savedChats); } catch(e) {}
-  }
+  if (savedChats) { try { chatHistory = JSON.parse(savedChats); } catch(e) {} }
   updateAuthUI();
 }
 
@@ -55,16 +51,12 @@ function updateAuthUI() {
     document.getElementById('user-display-name').textContent = currentUser.username;
     document.getElementById('user-avatar-letter').textContent = currentUser.username[0].toUpperCase();
   }
-  // Chat wall
   const wall = document.getElementById('chat-auth-wall');
   const loggedInArea = document.getElementById('chat-logged-in');
   if (wall && loggedInArea) {
     wall.style.display = loggedIn ? 'none' : 'flex';
     loggedInArea.style.display = loggedIn ? 'flex' : 'none';
-    if (loggedIn) {
-      loggedInArea.style.flexDirection = 'column';
-      renderChatHistory();
-    }
+    if (loggedIn) { loggedInArea.style.flexDirection = 'column'; renderChatHistory(); }
   }
 }
 
@@ -93,13 +85,10 @@ function switchModalTab(tab) {
 function submitAuth() {
   const errEl = document.getElementById('modal-error');
   errEl.textContent = '';
-
   if (modalMode === 'login') {
     const username = document.getElementById('login-user').value.trim();
     const password = document.getElementById('login-pass').value;
     if (!username || !password) { errEl.textContent = 'Tüm alanları doldurun.'; return; }
-
-    // Load accounts
     const accounts = JSON.parse(localStorage.getItem('tv-accounts') || '{}');
     if (!accounts[username] || accounts[username].password !== btoa(password)) {
       errEl.textContent = 'Kullanıcı adı veya şifre hatalı.'; return;
@@ -109,11 +98,9 @@ function submitAuth() {
     closeAuthModal();
     updateAuthUI();
     addLog(`Hoş geldin, ${username}!`, 'insert');
-    // Welcome message
     if (!chatHistory[username] || chatHistory[username].length === 0) {
       addChatMessage('ai', `Merhaba ${username}! 👋 Ağaç veri yapıları hakkında sorularınızı yanıtlamaya hazırım.`);
     }
-
   } else {
     const username = document.getElementById('reg-user').value.trim();
     const email    = document.getElementById('reg-email').value.trim();
@@ -121,13 +108,10 @@ function submitAuth() {
     if (!username || !email || !password) { errEl.textContent = 'Tüm alanları doldurun.'; return; }
     if (username.length < 3) { errEl.textContent = 'Kullanıcı adı en az 3 karakter olmalı.'; return; }
     if (password.length < 6) { errEl.textContent = 'Şifre en az 6 karakter olmalı.'; return; }
-
     const accounts = JSON.parse(localStorage.getItem('tv-accounts') || '{}');
     if (accounts[username]) { errEl.textContent = 'Bu kullanıcı adı zaten alınmış.'; return; }
-
     accounts[username] = { password: btoa(password), email };
     localStorage.setItem('tv-accounts', JSON.stringify(accounts));
-
     currentUser = { username, email };
     localStorage.setItem('tv-user', JSON.stringify(currentUser));
     chatHistory[username] = [];
@@ -142,9 +126,31 @@ function submitAuth() {
 function doLogout() {
   currentUser = null;
   localStorage.removeItem('tv-user');
+
+  // Reset all trees
+  trees = { avl: new AVLTree(), rb: new RBTree(), btree: new BTree(2) };
+  currentTree = 'avl';
+  stepQueue = []; stepIndex = 0; isPlaying = false; clearInterval(playTimer);
+  metrics = { rotations: 0, ops: 0 }; isFirstRender = true;
+
+  // Reset UI
+  document.querySelectorAll('.tree-tab').forEach((t, i) => {
+    t.classList.toggle('active', i === 0);
+  });
+  updateStepIndicator();
+  hideStepOverlay();
+  document.getElementById('traversal-result').style.display = 'none';
+  render(new Map());
+  updateLegend();
+
+  if (activeRightPanel === 'pseudo') {
+    currentHighlightedLines = new Set();
+    renderPseudoCode('avl');
+  }
+
   updateAuthUI();
-  addLog('Çıkış yapıldı.', 'info');
-  // Clear chat UI
+  addLog('Çıkış yapıldı. Tüm ağaçlar sıfırlandı.', 'info');
+
   const msgs = document.getElementById('chat-messages');
   if (msgs) msgs.innerHTML = '';
 }
@@ -186,46 +192,33 @@ function appendChatBubble(role, text) {
   msgs.scrollTop = msgs.scrollHeight;
 }
 
-function saveChats() {
-  localStorage.setItem('tv-chats', JSON.stringify(chatHistory));
-}
+function saveChats() { localStorage.setItem('tv-chats', JSON.stringify(chatHistory)); }
 
 function chatKeyDown(e) {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
 }
 
-// Smart assistant responses about trees
 function getTreeAnswer(question) {
   const q = question.toLowerCase();
   const tree = currentTree.toUpperCase();
-
-  if (q.includes('avl') || (currentTree === 'avl' && (q.includes('denge') || q.includes('balance')))) {
+  if (q.includes('avl') || (currentTree === 'avl' && (q.includes('denge') || q.includes('balance'))))
     return 'AVL ağacında her düğümün denge faktörü (BF) -1, 0 veya +1 arasında olmalıdır. Bu sağlanmak için rotasyon yapılır.';
-  }
-  if (q.includes('red') || q.includes('kırmızı') || q.includes('rb') || q.includes('siyah') || q.includes('black')) {
+  if (q.includes('red') || q.includes('kırmızı') || q.includes('rb') || q.includes('siyah') || q.includes('black'))
     return 'Red-Black ağacında kök daima siyah, kırmızı düğümlerin çocukları siyah olmalıdır. Yükseklik O(log n) garantilidir.';
-  }
-  if (q.includes('rotation') || q.includes('rotasyon') || q.includes('dönd')) {
+  if (q.includes('rotation') || q.includes('rotasyon') || q.includes('dönd'))
     return `${tree} ağacında rotasyon, dengeyi korumak için kullanılır. Sol/sağ rotasyon ve LL/LR/RL/RR durumları mevcuttur.`;
-  }
-  if (q.includes('inorder') || q.includes('sıralı')) {
+  if (q.includes('inorder') || q.includes('sıralı'))
     return 'Inorder (Soldan-Kök-Sağa) gezinme, BST\'de her zaman sıralı çıktı verir.';
-  }
-  if (q.includes('yükseklik') || q.includes('height')) {
+  if (q.includes('yükseklik') || q.includes('height'))
     return `${tree} ağacının yüksekliği O(log n)\'dir. Şu an yükseklik: ${trees[currentTree].getHeight()}.`;
-  }
-  if (q.includes('ekle') || q.includes('insert')) {
+  if (q.includes('ekle') || q.includes('insert'))
     return `${tree} ağacına ekleme O(log n) karmaşıklığında gerçekleşir. Sol panelde değer girip "Insert" butonuna tıklayın.`;
-  }
-  if (q.includes('sil') || q.includes('delete')) {
-    return `${tree} ağacından silme işlemi O(log n) karmaşıklığındadır. Halef (successor) veya öncül (predecessor) kullanılabilir.`;
-  }
-  if (q.includes('b-tree') || q.includes('btree') || q.includes('b ağaç')) {
+  if (q.includes('sil') || q.includes('delete'))
+    return `${tree} ağacından silme işlemi O(log n) karmaşıklığındadır.`;
+  if (q.includes('b-tree') || q.includes('btree') || q.includes('b ağaç'))
     return 'B-Tree, her düğümde birden fazla anahtar tutan dengeli bir arama ağacıdır. Veritabanlarında yaygın kullanılır.';
-  }
-  if (q.includes('karmaşıklık') || q.includes('complexity') || q.includes('big o') || q.includes('o(')) {
+  if (q.includes('karmaşıklık') || q.includes('complexity') || q.includes('big o'))
     return `${tree} için: Arama/Ekleme/Silme O(log n), Alan O(n). Şu an ${trees[currentTree].size()} düğüm var.`;
-  }
   return `Harika soru! ${tree} ağacı hakkında daha spesifik sormak ister misiniz? Rotasyon, traversal, karmaşıklık veya diğer konularda yardımcı olabilirim.`;
 }
 
@@ -235,10 +228,7 @@ function sendChatMessage() {
   const text = input.value.trim();
   if (!text) return;
   input.value = '';
-
   addChatMessage('user', text);
-
-  // Typing indicator
   const msgs = document.getElementById('chat-messages');
   const typing = document.createElement('div');
   typing.className = 'chat-msg ai';
@@ -247,45 +237,48 @@ function sendChatMessage() {
     <div class="chat-bubble"><div class="chat-typing"><span></span><span></span><span></span></div></div>`;
   msgs.appendChild(typing);
   msgs.scrollTop = msgs.scrollHeight;
-
   setTimeout(() => {
     const t = document.getElementById('typing-indicator');
     if (t) t.remove();
-    const answer = getTreeAnswer(text);
-    addChatMessage('ai', answer);
+    addChatMessage('ai', getTreeAnswer(text));
   }, 900 + Math.random() * 600);
 }
 
 // ============================================================
 // RIGHT PANEL SYSTEM
 // ============================================================
-let activeRightPanel = null; // 'pseudo' | 'chat' | null
+let activeRightPanel = null;
 
 function toggleRightPanel(panel) {
-  const content = document.getElementById('right-panel-content');
-  const pseudoP = document.getElementById('pseudo-panel');
-  const chatP   = document.getElementById('chat-panel');
-  const tabPseudo = document.getElementById('rtab-pseudo');
-  const tabChat   = document.getElementById('rtab-chat');
+  const content    = document.getElementById('right-panel-content');
+  const pseudoP    = document.getElementById('pseudo-panel');
+  const chatP      = document.getElementById('chat-panel');
+  const bigoP      = document.getElementById('bigo-panel');
+  const historyP   = document.getElementById('history-panel');
+  const tabPseudo  = document.getElementById('rtab-pseudo');
+  const tabChat    = document.getElementById('rtab-chat');
+  const tabBigo    = document.getElementById('rtab-bigo');
+  const tabHistory = document.getElementById('rtab-history');
 
   if (activeRightPanel === panel) {
-    // Close
     content.classList.remove('open');
     activeRightPanel = null;
-    tabPseudo.classList.remove('active');
-    tabChat.classList.remove('active');
+    [tabPseudo, tabChat, tabBigo, tabHistory].forEach(t => t && t.classList.remove('active'));
   } else {
-    // Open or switch
     activeRightPanel = panel;
     content.classList.add('open');
-    pseudoP.classList.toggle('active', panel === 'pseudo');
-    chatP.classList.toggle('active', panel === 'chat');
-    tabPseudo.classList.toggle('active', panel === 'pseudo');
-    tabChat.classList.toggle('active', panel === 'chat');
-    if (panel === 'pseudo') renderPseudoCode(currentTree);
+    pseudoP.classList.toggle('active',  panel === 'pseudo');
+    chatP.classList.toggle('active',    panel === 'chat');
+    bigoP.classList.toggle('active',    panel === 'bigo');
+    historyP.classList.toggle('active', panel === 'history');
+    tabPseudo.classList.toggle('active',  panel === 'pseudo');
+    tabChat.classList.toggle('active',    panel === 'chat');
+    if (tabBigo)    tabBigo.classList.toggle('active',    panel === 'bigo');
+    if (tabHistory) tabHistory.classList.toggle('active', panel === 'history');
+    if (panel === 'pseudo')  renderPseudoCode(currentTree);
+    if (panel === 'bigo')    renderBigO(currentTree);
+    if (panel === 'history') renderHistoryPanel();
   }
-
-  // After panel opens/closes, recenter the tree view
   setTimeout(() => fitTreeToView(), 350);
 }
 
@@ -297,26 +290,26 @@ const pseudoData = {
     badge: 'AVL',
     sections: [
       { title: 'Insert(value)', lines: [
-        { text: 'function insert(node, value):', kw: [0] },
-        { text: '  if node == null:', kw: [1] },
-        { text: '    return new Node(value)   // ← leaf', cm: true },
-        { text: '  if value < node.key:', kw: [1] },
-        { text: '    node.left = insert(left, value)', fn: [4] },
-        { text: '  else if value > node.key:', kw: [1,3] },
-        { text: '    node.right = insert(right, value)', fn: [4] },
-        { text: '  updateHeight(node)', fn: [0] },
-        { text: '  return balance(node)', kw: [0], fn: [1] },
+        { text: 'function insert(node, value):' },
+        { text: '  if node == null:' },
+        { text: '    return new Node(value)   // ← leaf' },
+        { text: '  if value < node.key:' },
+        { text: '    node.left = insert(left, value)' },
+        { text: '  else if value > node.key:' },
+        { text: '    node.right = insert(right, value)' },
+        { text: '  updateHeight(node)' },
+        { text: '  return balance(node)' },
       ]},
       { title: 'Balance(node)', lines: [
-        { text: 'function balance(node):', kw: [0] },
-        { text: '  bf = height(left) - height(right)', fn: [0] },
-        { text: '  if bf > 1:  // left heavy', kw: [1], cm: true },
-        { text: '    if bf(left) < 0: rotateLeft(left)', fn: [2,3] },
-        { text: '    return rotateRight(node)', kw: [0], fn: [1] },
-        { text: '  if bf < -1: // right heavy', kw: [1], cm: true },
-        { text: '    if bf(right) > 0: rotateRight(right)', fn: [2,3] },
-        { text: '    return rotateLeft(node)', kw: [0], fn: [1] },
-        { text: '  return node   // already balanced', kw: [0], cm: true },
+        { text: 'function balance(node):' },
+        { text: '  bf = height(left) - height(right)' },
+        { text: '  if bf > 1:  // left heavy' },
+        { text: '    if bf(left) < 0: rotateLeft(left)' },
+        { text: '    return rotateRight(node)' },
+        { text: '  if bf < -1: // right heavy' },
+        { text: '    if bf(right) > 0: rotateRight(right)' },
+        { text: '    return rotateLeft(node)' },
+        { text: '  return node   // already balanced' },
       ]},
     ],
     complexity: [
@@ -330,25 +323,25 @@ const pseudoData = {
     badge: 'Red-Black',
     sections: [
       { title: 'Insert + Fix(node)', lines: [
-        { text: 'function insert(value):', kw: [0] },
-        { text: '  node = bstInsert(value)', fn: [2] },
-        { text: '  node.color = RED', kw: [2] },
-        { text: '  fixInsert(node)', fn: [0] },
-        { text: '', },
-        { text: 'function fixInsert(z):', kw: [0] },
-        { text: '  while parent(z).color == RED:', kw: [0,3], fn: [1] },
-        { text: '    uncle = getUncle(z)', fn: [2] },
-        { text: '    if uncle.color == RED:', kw: [1,3] },
-        { text: '      recolor(parent, uncle, gp)  ', fn: [0] },
-        { text: '    else:', kw: [0] },
-        { text: '      rotate + recolor', fn: [0,2] },
-        { text: '  root.color = BLACK', kw: [2] },
+        { text: 'function insert(value):' },
+        { text: '  node = bstInsert(value)' },
+        { text: '  node.color = RED' },
+        { text: '  fixInsert(node)' },
+        { text: '' },
+        { text: 'function fixInsert(z):' },
+        { text: '  while parent(z).color == RED:' },
+        { text: '    uncle = getUncle(z)' },
+        { text: '    if uncle.color == RED:' },
+        { text: '      recolor(parent, uncle, gp)  ' },
+        { text: '    else:' },
+        { text: '      rotate + recolor' },
+        { text: '  root.color = BLACK' },
       ]},
       { title: 'RB Properties', lines: [
-        { text: '  1. Every node: RED or BLACK', },
-        { text: '  2. Root is always BLACK', },
-        { text: '  3. Red node → BLACK children', },
-        { text: '  4. Equal black-height on all paths', },
+        { text: '  1. Every node: RED or BLACK' },
+        { text: '  2. Root is always BLACK' },
+        { text: '  3. Red node → BLACK children' },
+        { text: '  4. Equal black-height on all paths' },
       ]},
     ],
     complexity: [
@@ -362,26 +355,26 @@ const pseudoData = {
     badge: 'B-Tree',
     sections: [
       { title: 'Insert(value)', lines: [
-        { text: 'function insert(value):', kw: [0] },
-        { text: '  if root is full:', kw: [1] },
-        { text: '    newRoot = Node()', fn: [2] },
-        { text: '    splitChild(newRoot, root)', fn: [0] },
-        { text: '    root = newRoot', kw: [2] },
-        { text: '  insertNonFull(root, value)', fn: [0] },
+        { text: 'function insert(value):' },
+        { text: '  if root is full:' },
+        { text: '    newRoot = Node()' },
+        { text: '    splitChild(newRoot, root)' },
+        { text: '    root = newRoot' },
+        { text: '  insertNonFull(root, value)' },
       ]},
       { title: 'SplitChild(parent, i)', lines: [
-        { text: 'function splitChild(x, i):', kw: [0] },
-        { text: '  y = x.children[i]  // full child', cm: true },
-        { text: '  z = new Node(y.leaf)', fn: [2] },
-        { text: '  // promote median key to parent', cm: true },
-        { text: '  x.keys.insert(y.keys[t-1])', fn: [1] },
-        { text: '  z.keys = y.keys[t .. 2t-2]', fn: [1] },
-        { text: '  y.keys = y.keys[0 .. t-2]', fn: [1] },
+        { text: 'function splitChild(x, i):' },
+        { text: '  y = x.children[i]  // full child' },
+        { text: '  z = new Node(y.leaf)' },
+        { text: '  // promote median key to parent' },
+        { text: '  x.keys.insert(y.keys[t-1])' },
+        { text: '  z.keys = y.keys[t .. 2t-2]' },
+        { text: '  y.keys = y.keys[0 .. t-2]' },
       ]},
       { title: 'Properties', lines: [
-        { text: '  Min keys per node: t-1', },
-        { text: '  Max keys per node: 2t-1', },
-        { text: '  All leaves at same depth', },
+        { text: '  Min keys per node: t-1' },
+        { text: '  Max keys per node: 2t-1' },
+        { text: '  All leaves at same depth' },
       ]},
     ],
     complexity: [
@@ -392,71 +385,118 @@ const pseudoData = {
     ],
   },
 };
-
-// Lines to highlight for each step kind
-const pseudoHighlightMap = {
+// ============================================================
+// BIG O DATA
+// ============================================================
+const bigOData = {
   avl: {
-    insert: { 'new': [2], 'path': [3,4,5,6], 'rotate': [1,2,3,4,5,6,7,8], 'default': [0] },
-    balance: { 'rotate': [1,2,3,4,5,6,7,8] },
+    note: '<b>AVL Tree</b>, her düğümde denge faktörünü (BF) −1..+1 arasında tutar. Rotasyonlar O(1) zaman alır ancak insert/delete başına birden fazla rotasyon tetiklenebilir.',
+    ops: [
+      { name: 'Search',   best: ['O(log n)','good'],  avg: ['O(log n)','good'],  worst: ['O(log n)','good']  },
+      { name: 'Insert',   best: ['O(log n)','good'],  avg: ['O(log n)','good'],  worst: ['O(log n)','good']  },
+      { name: 'Delete',   best: ['O(log n)','good'],  avg: ['O(log n)','good'],  worst: ['O(log n)','good']  },
+      { name: 'Rotation', best: ['O(1)','good'],      avg: ['O(1)','good'],      worst: ['O(log n)','good']  },
+      { name: 'Space',    best: ['O(n)','medium'],    avg: ['O(n)','medium'],    worst: ['O(n)','medium']    },
+    ],
   },
   rb: {
-    insert: { 'new': [1,2], 'recolor': [8,9,10,11], 'rotate': [10,11,12], 'path': [6,7] },
+    note: '<b>Red-Black Tree</b>, AVL\'den daha az sıkı dengeli; rotasyon sayısı insert\'te max 2, delete\'te max 3 ile sınırlıdır. Pratikte yazma ağırlıklı workload\'larda tercih edilir.',
+    ops: [
+      { name: 'Search',   best: ['O(log n)','good'],  avg: ['O(log n)','good'],  worst: ['O(log n)','good']  },
+      { name: 'Insert',   best: ['O(log n)','good'],  avg: ['O(log n)','good'],  worst: ['O(log n)','good']  },
+      { name: 'Delete',   best: ['O(log n)','good'],  avg: ['O(log n)','good'],  worst: ['O(log n)','good']  },
+      { name: 'Rotation', best: ['O(1)','good'],      avg: ['O(1)','good'],      worst: ['O(1)','good']      },
+      { name: 'Space',    best: ['O(n)','medium'],    avg: ['O(n)','medium'],    worst: ['O(n)','medium']    },
+    ],
   },
   btree: {
-    insert: { 'new': [5], 'rotate': [1,2,3,4,5], 'path': [5] },
+    note: '<b>B-Tree (t=2)</b>, her node\'da birden fazla anahtar tutar. <b>t</b> minimum derece; bir node en fazla <b>2t−1</b> anahtar içerebilir. Disk I/O\'yu minimize etmek için tasarlanmıştır.',
+    ops: [
+      { name: 'Search',   best: ['O(log n)','good'],  avg: ['O(t·log n)','good'],   worst: ['O(t·log n)','good']   },
+      { name: 'Insert',   best: ['O(log n)','good'],  avg: ['O(t·log n)','good'],   worst: ['O(t·log n)','good']   },
+      { name: 'Delete',   best: ['O(log n)','good'],  avg: ['O(t·log n)','good'],   worst: ['O(t·log n)','good']   },
+      { name: 'Split',    best: ['O(1)','good'],      avg: ['O(t)','good'],         worst: ['O(t)','good']         },
+      { name: 'Space',    best: ['O(n)','medium'],    avg: ['O(n)','medium'],       worst: ['O(n)','medium']       },
+    ],
   },
 };
+// ============================================================
+// BIG O DATA
+// ============================================================
+function renderBigO(treeType) {
+  const data = bigOData[treeType];
+  if (!data) return;
+  const area = document.getElementById('bigo-area');
+  if (!area) return;
+
+  const names = { avl: 'AVL Tree', rb: 'Red-Black Tree', btree: 'B-Tree (t = 2)' };
+
+  let html = `<div class="bigo-tree-title">${names[treeType] || treeType}</div>`;
+  html += `<table class="bigo-table">
+    <thead><tr>
+      <th>Operation</th>
+      <th>Best</th>
+      <th>Average</th>
+      <th>Worst</th>
+    </tr></thead><tbody>`;
+
+  data.ops.forEach(op => {
+    html += `<tr>
+      <td class="bigo-op">${op.name}</td>
+      <td><span class="bigo-badge ${op.best[1]}">${op.best[0]}</span></td>
+      <td><span class="bigo-badge ${op.avg[1]}">${op.avg[0]}</span></td>
+      <td><span class="bigo-badge ${op.worst[1]}">${op.worst[0]}</span></td>
+    </tr>`;
+  });
+
+  html += `</tbody></table>`;
+  html += `<div class="bigo-note">${data.note}</div>`;
+
+  // Comparison card
+  html += `<div class="bigo-compare">
+    <div class="bigo-compare-title">🏆 Karşılaştırma — Search/Insert/Delete</div>
+    <div class="bigo-compare-row"><span class="bigo-compare-tree">AVL Tree</span><span class="bigo-compare-val">O(log n) — Strict</span></div>
+    <div class="bigo-compare-row"><span class="bigo-compare-tree">Red-Black</span><span class="bigo-compare-val">O(log n) — Relaxed</span></div>
+    <div class="bigo-compare-row"><span class="bigo-compare-tree">B-Tree</span><span class="bigo-compare-val">O(t·log n) — Disk</span></div>
+  </div>`;
+
+  area.innerHTML = html;
+}
 
 let currentHighlightedLines = new Set();
 
 function renderPseudoCode(treeType, stepKind) {
   const data = pseudoData[treeType];
   if (!data) return;
-
-  // Badge
   const badge = document.getElementById('pseudo-tree-badge');
   if (badge) badge.textContent = data.badge;
-
   const area = document.getElementById('pseudo-code-area');
   if (!area) return;
   area.innerHTML = '';
-
   let lineGlobalIndex = 0;
-
   data.sections.forEach(section => {
     const titleEl = document.createElement('div');
     titleEl.className = 'pseudo-section-title';
     titleEl.textContent = section.title;
     area.appendChild(titleEl);
-
-    section.lines.forEach((lineData, localIdx) => {
+    section.lines.forEach(lineData => {
       const lineEl = document.createElement('div');
       lineEl.className = 'pseudo-line';
       lineEl.dataset.lineIndex = lineGlobalIndex;
-
-      // Line number
       const numEl = document.createElement('span');
       numEl.className = 'pseudo-num';
       numEl.textContent = lineGlobalIndex + 1;
       lineEl.appendChild(numEl);
-
-      // Text with syntax coloring
       const textEl = document.createElement('span');
       textEl.className = 'pseudo-text';
       if (!lineData.text) { textEl.innerHTML = '&nbsp;'; }
       else { textEl.innerHTML = syntaxColor(lineData.text); }
       lineEl.appendChild(textEl);
-
-      if (currentHighlightedLines.has(lineGlobalIndex)) {
-        lineEl.classList.add('highlighted');
-      }
-
+      if (currentHighlightedLines.has(lineGlobalIndex)) lineEl.classList.add('highlighted');
       area.appendChild(lineEl);
       lineGlobalIndex++;
     });
   });
-
-  // Complexity
   const bar = document.getElementById('complexity-bar');
   if (bar) {
     bar.innerHTML = '';
@@ -472,35 +512,27 @@ function renderPseudoCode(treeType, stepKind) {
 
 function syntaxColor(text) {
   const keywords = ['function', 'if', 'else', 'while', 'return', 'new', 'null'];
-  let result = '';
-  // Simple token-based coloring
-  let i = 0;
+  let result = '', i = 0;
   while (i < text.length) {
-    // Comment
     if (text[i] === '/' && text[i+1] === '/') {
-      result += `<span class="pseudo-cm">${escHtml(text.slice(i))}</span>`;
-      break;
+      result += `<span class="pseudo-cm">${escHtml(text.slice(i))}</span>`; break;
     }
-    // Try keyword
     let matched = false;
     for (const kw of keywords) {
-      if (text.slice(i, i+kw.length) === kw && (i+kw.length >= text.length || !/\w/.test(text[i+kw.length])) && (i === 0 || !/\w/.test(text[i-1]))) {
+      if (text.slice(i, i+kw.length) === kw &&
+          (i+kw.length >= text.length || !/\w/.test(text[i+kw.length])) &&
+          (i === 0 || !/\w/.test(text[i-1]))) {
         result += `<span class="pseudo-kw">${kw}</span>`;
-        i += kw.length;
-        matched = true;
-        break;
+        i += kw.length; matched = true; break;
       }
     }
     if (matched) continue;
-    // Numbers
     if (/[0-9]/.test(text[i]) && (i === 0 || !/\w/.test(text[i-1]))) {
       let num = '';
       while (i < text.length && /[\d.tn\-+]/.test(text[i])) { num += text[i]; i++; }
-      result += `<span class="pseudo-num-val">${escHtml(num)}</span>`;
-      continue;
+      result += `<span class="pseudo-num-val">${escHtml(num)}</span>`; continue;
     }
-    result += escHtml(text[i]);
-    i++;
+    result += escHtml(text[i]); i++;
   }
   return result;
 }
@@ -509,24 +541,14 @@ function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// Highlight pseudo-code lines based on current step kind
 function highlightPseudoLines(stepKind) {
   if (!activeRightPanel || activeRightPanel !== 'pseudo') return;
-
   const kindMap = {
-    new:     [2],          // AVL: the "return new Node" line
-    path:    [3,4,5,6],    // Comparisons
-    rotate:  [7,8],        // balance calls
-    recolor: [9,10,11,12], // RB fix
-    found:   [],
-    delete:  [7,8],
-    info:    [],
+    new:     [2], path: [3,4,5,6], rotate: [7,8],
+    recolor: [9,10,11,12], found: [], delete: [7,8], info: [],
   };
-
   currentHighlightedLines = new Set(kindMap[stepKind] || []);
   renderPseudoCode(currentTree);
-
-  // Scroll to first highlighted line
   const area = document.getElementById('pseudo-code-area');
   if (!area) return;
   const hl = area.querySelector('.pseudo-line.highlighted');
@@ -557,53 +579,39 @@ class AVLNode {
 
 class AVLTree {
   constructor() { this.root = null; }
-
   height(n) { return n ? n.height : 0; }
   bf(n)     { return n ? this.height(n.left) - this.height(n.right) : 0; }
-
   update(n) {
     if (!n) return;
     n.height = 1 + Math.max(this.height(n.left), this.height(n.right));
     n.bf = this.bf(n);
   }
-
   rotateRight(y, steps) {
     let x = y.left, T2 = x.right;
     steps.push({ type: 'rotate', desc: `Right rotation on ${y.val}`, highlight: [y.id, x.id], kind: 'rotate' });
     x.right = y; y.left = T2;
     this.update(y); this.update(x);
-    metrics.rotations++;
-    return x;
+    metrics.rotations++; return x;
   }
-
   rotateLeft(x, steps) {
     let y = x.right, T2 = y.left;
     steps.push({ type: 'rotate', desc: `Left rotation on ${x.val}`, highlight: [x.id, y.id], kind: 'rotate' });
     y.left = x; x.right = T2;
     this.update(x); this.update(y);
-    metrics.rotations++;
-    return y;
+    metrics.rotations++; return y;
   }
-
   balance(n, steps) {
     this.update(n);
     if (n.bf > 1) {
-      if (this.bf(n.left) < 0) {
-        steps.push({ type: 'rotate', desc: `LR case at ${n.val}`, highlight: [n.id], kind: 'rotate' });
-        n.left = this.rotateLeft(n.left, steps);
-      }
+      if (this.bf(n.left) < 0) { steps.push({ type: 'rotate', desc: `LR case at ${n.val}`, highlight: [n.id], kind: 'rotate' }); n.left = this.rotateLeft(n.left, steps); }
       return this.rotateRight(n, steps);
     }
     if (n.bf < -1) {
-      if (this.bf(n.right) > 0) {
-        steps.push({ type: 'rotate', desc: `RL case at ${n.val}`, highlight: [n.id], kind: 'rotate' });
-        n.right = this.rotateRight(n.right, steps);
-      }
+      if (this.bf(n.right) > 0) { steps.push({ type: 'rotate', desc: `RL case at ${n.val}`, highlight: [n.id], kind: 'rotate' }); n.right = this.rotateRight(n.right, steps); }
       return this.rotateLeft(n, steps);
     }
     return n;
   }
-
   _insert(n, val, steps) {
     if (!n) {
       let node = new AVLNode(val);
@@ -616,15 +624,11 @@ class AVLTree {
     else { steps.push({ type: 'info', desc: `${val} already exists`, highlight: [n.id], kind: 'found' }); return n; }
     return this.balance(n, steps);
   }
-
   insert(val) {
     let steps = [{ type: 'info', desc: `Inserting ${val} into AVL Tree`, highlight: [], kind: 'info' }];
-    this.root = this._insert(this.root, val, steps);
-    return steps;
+    this.root = this._insert(this.root, val, steps); return steps;
   }
-
   minNode(n) { while (n.left) n = n.left; return n; }
-
   _delete(n, val, steps) {
     if (!n) return null;
     steps.push({ type: 'visit', desc: `Checking ${n.val}`, highlight: [n.id], kind: 'path' });
@@ -638,40 +642,32 @@ class AVLTree {
       } else {
         let succ = this.minNode(n.right);
         steps.push({ type: 'info', desc: `In-order successor: ${succ.val}`, highlight: [succ.id], kind: 'highlight' });
-        n.val = succ.val;
-        n.right = this._delete(n.right, succ.val, steps);
+        n.val = succ.val; n.right = this._delete(n.right, succ.val, steps);
       }
     }
     if (!n) return null;
     return this.balance(n, steps);
   }
-
   delete(val) {
     let steps = [{ type: 'info', desc: `Deleting ${val} from AVL Tree`, highlight: [], kind: 'info' }];
-    this.root = this._delete(this.root, val, steps);
-    return steps;
+    this.root = this._delete(this.root, val, steps); return steps;
   }
-
   _search(n, val, steps) {
     if (!n) { steps.push({ type: 'info', desc: `${val} not found`, highlight: [], kind: 'info' }); return; }
     steps.push({ type: 'visit', desc: `Visiting ${n.val}`, highlight: [n.id], kind: 'path' });
     if (val === n.val) { steps.push({ type: 'found', desc: `Found ${val}!`, highlight: [n.id], kind: 'found' }); return; }
-    if (val < n.val) this._search(n.left,  val, steps);
-    else             this._search(n.right, val, steps);
+    if (val < n.val) this._search(n.left, val, steps); else this._search(n.right, val, steps);
   }
-
   search(val) {
     let steps = [{ type: 'info', desc: `Searching for ${val}`, highlight: [], kind: 'info' }];
-    this._search(this.root, val, steps);
-    return steps;
+    this._search(this.root, val, steps); return steps;
   }
-
   size(n = this.root)  { return n ? 1 + this.size(n.left) + this.size(n.right) : 0; }
   getHeight()          { return this.height(this.root); }
 }
 
 // ============================================================
-// RED-BLACK TREE
+// RED-BLACK TREE  (simplified animation — fewer steps)
 // ============================================================
 const RED = 'red', BLACK = 'black';
 
@@ -685,11 +681,10 @@ class RBNode {
 
 class RBTree {
   constructor() { this.root = null; this._steps = []; }
-
   isRed(n) { return n && n.color === RED; }
 
+  // ── Silent rotations (no step push) ──
   rotateLeft(n) {
-    this._steps.push({ type: 'rotate', desc: `Left rotate on ${n.val}`, highlight: [n.id, n.right?.id].filter(Boolean), kind: 'rotate' });
     let r = n.right;
     n.right = r.left;
     if (r.left) r.left.parent = n;
@@ -702,7 +697,6 @@ class RBTree {
   }
 
   rotateRight(n) {
-    this._steps.push({ type: 'rotate', desc: `Right rotate on ${n.val}`, highlight: [n.id, n.left?.id].filter(Boolean), kind: 'rotate' });
     let l = n.left;
     n.left = l.right;
     if (l.right) l.right.parent = n;
@@ -714,67 +708,79 @@ class RBTree {
     metrics.rotations++;
   }
 
+  // ── Insert: only 3 clean steps ──
   insert(val) {
     this._steps = [{ type: 'info', desc: `Inserting ${val} into Red-Black Tree`, highlight: [], kind: 'info' }];
     let node = new RBNode(val);
-    this._bstInsert(node);
-    this._steps.push({ type: 'insert', desc: `Inserted ${val} as RED node`, highlight: [node.id], kind: 'new' });
-    this._fixInsert(node);
+    let inserted = this._bstInsert(node);
+    if (!inserted) {
+      this._steps.push({ type: 'info', desc: `${val} already exists in tree`, highlight: [], kind: 'found' });
+      return this._steps;
+    }
+    this._steps.push({ type: 'insert', desc: `Placed ${val} as a new RED node`, highlight: [node.id], kind: 'new' });
+    let hadFix = this._fixInsert(node);
+    if (hadFix) {
+      this._steps.push({ type: 'rotate', desc: `Tree rebalanced — RB properties restored ✓`, highlight: [], kind: 'rotate' });
+    } else {
+      this._steps.push({ type: 'info', desc: `No fix needed — tree already valid ✓`, highlight: [], kind: 'info' });
+    }
     return this._steps;
   }
 
   _bstInsert(node) {
     let cur = this.root, par = null;
     while (cur) {
-      this._steps.push({ type: 'visit', desc: `Comparing ${node.val} with ${cur.val}`, highlight: [cur.id], kind: 'path' });
       par = cur;
       if      (node.val < cur.val) cur = cur.left;
       else if (node.val > cur.val) cur = cur.right;
-      else return;
+      else return false; // duplicate
     }
     node.parent = par;
     if (!par)                    this.root = node;
     else if (node.val < par.val) par.left  = node;
     else                         par.right = node;
+    return true;
   }
 
   _fixInsert(z) {
+    let fixed = false;
     while (z !== this.root && this.isRed(z.parent)) {
       let p = z.parent, g = p.parent;
       if (!g) break;
+      fixed = true;
       if (p === g.left) {
         let uncle = g.right;
         if (this.isRed(uncle)) {
-          this._steps.push({ type: 'recolor', desc: `Uncle RED — recolor parent+uncle→BLACK, gp→RED`, highlight: [p.id, uncle.id, g.id], kind: 'recolor' });
           p.color = BLACK; uncle.color = BLACK; g.color = RED; z = g;
         } else {
           if (z === p.right) { z = p; this.rotateLeft(z); p = z.parent; g = p?.parent; if (!g) break; }
-          this._steps.push({ type: 'recolor', desc: `Recolor parent→BLACK, grandparent→RED`, highlight: [p.id, g.id], kind: 'recolor' });
-          p.color = BLACK; g.color = RED;
-          this.rotateRight(g);
+          p.color = BLACK; g.color = RED; this.rotateRight(g);
         }
       } else {
         let uncle = g.left;
         if (this.isRed(uncle)) {
-          this._steps.push({ type: 'recolor', desc: `Uncle RED — recolor`, highlight: [p.id, uncle.id, g.id], kind: 'recolor' });
           p.color = BLACK; uncle.color = BLACK; g.color = RED; z = g;
         } else {
           if (z === p.left) { z = p; this.rotateRight(z); p = z.parent; g = p?.parent; if (!g) break; }
-          this._steps.push({ type: 'recolor', desc: `Recolor parent→BLACK, grandparent→RED`, highlight: [p.id, g.id], kind: 'recolor' });
-          p.color = BLACK; g.color = RED;
-          this.rotateLeft(g);
+          p.color = BLACK; g.color = RED; this.rotateLeft(g);
         }
       }
     }
     this.root.color = BLACK;
+    return fixed;
   }
 
+  // ── Delete: 3 clean steps ──
   delete(val) {
-    this._steps = [{ type: 'info', desc: `Delete ${val} from Red-Black`, highlight: [], kind: 'info' }];
+    this._steps = [{ type: 'info', desc: `Deleting ${val} from Red-Black Tree`, highlight: [], kind: 'info' }];
     let node = this._find(val);
-    if (!node) { this._steps.push({ type: 'info', desc: `${val} not found`, highlight: [], kind: 'info' }); return this._steps; }
-    this._steps.push({ type: 'delete', desc: `Found ${val} — removing`, highlight: [node.id], kind: 'delete' });
+    if (!node) {
+      this._steps.push({ type: 'info', desc: `${val} not found in tree`, highlight: [], kind: 'info' });
+      return this._steps;
+    }
+    this._steps.push({ type: 'delete', desc: `Found ${val} — removing node`, highlight: [node.id], kind: 'delete' });
     this._rbDelete(node);
+    this._steps.push({ type: 'info', desc: `Deletion complete — tree rebalanced ✓`, highlight: [], kind: 'info' });
     return this._steps;
   }
 
@@ -810,6 +816,7 @@ class RBTree {
 
   _min(n) { while (n.left) n = n.left; return n; }
 
+  // ── Search: keeps step-by-step path (useful to see) ──
   search(val) {
     let steps = [{ type: 'info', desc: `Searching for ${val} in RB Tree`, highlight: [], kind: 'info' }];
     let cur = this.root;
@@ -851,11 +858,8 @@ class BTree {
       let s = new BTreeNode(false);
       this.root = s; s.children.push(r);
       this._steps.push({ type: 'split', desc: `Root full — splitting root`, highlight: [r.id], kind: 'rotate' });
-      this._splitChild(s, 0);
-      this._insertNonFull(s, val);
-    } else {
-      this._insertNonFull(r, val);
-    }
+      this._splitChild(s, 0); this._insertNonFull(s, val);
+    } else { this._insertNonFull(r, val); }
     return this._steps;
   }
 
@@ -866,21 +870,18 @@ class BTree {
       n.keys.splice(i + 1, 0, val);
       this._steps.push({ type: 'insert', desc: `Inserted ${val} into leaf`, highlight: [n.id], kind: 'new' });
     } else {
-      while (i >= 0 && val < n.keys[i]) i--;
-      i++;
+      while (i >= 0 && val < n.keys[i]) i--; i++;
       this._steps.push({ type: 'visit', desc: `Descending into child ${i}`, highlight: [n.id], kind: 'path' });
       if (n.children[i].keys.length === 2 * this.t - 1) {
         this._steps.push({ type: 'split', desc: `Child full — splitting`, highlight: [n.children[i].id], kind: 'rotate' });
-        this._splitChild(n, i);
-        if (val > n.keys[i]) i++;
+        this._splitChild(n, i); if (val > n.keys[i]) i++;
       }
       this._insertNonFull(n.children[i], val);
     }
   }
 
   _splitChild(x, i) {
-    let t = this.t, y = x.children[i];
-    let z = new BTreeNode(y.leaf);
+    let t = this.t, y = x.children[i], z = new BTreeNode(y.leaf);
     x.children.splice(i + 1, 0, z);
     x.keys.splice(i, 0, y.keys[t - 1]);
     z.keys = y.keys.splice(t, t - 1);
@@ -901,45 +902,37 @@ class BTree {
     if (i === -1) i = n.keys.length;
     if (i < n.keys.length && n.keys[i] === val) {
       this._steps.push({ type: 'delete', desc: `Found ${val} in node`, highlight: [n.id], kind: 'delete' });
-      if (n.leaf) {
-        n.keys.splice(i, 1);
-      } else {
-        if (n.children[i].keys.length >= t) {
-          let pred = this._getPred(n.children[i]);
-          n.keys[i] = pred; this._delete(n.children[i], pred);
-        } else if (n.children[i + 1].keys.length >= t) {
-          let succ = this._getSucc(n.children[i + 1]);
-          n.keys[i] = succ; this._delete(n.children[i + 1], succ);
-        } else {
-          this._merge(n, i); this._delete(n.children[i], val);
-        }
+      if (n.leaf) { n.keys.splice(i, 1); }
+      else {
+        if (n.children[i].keys.length >= t) { let pred = this._getPred(n.children[i]); n.keys[i] = pred; this._delete(n.children[i], pred); }
+        else if (n.children[i+1].keys.length >= t) { let succ = this._getSucc(n.children[i+1]); n.keys[i] = succ; this._delete(n.children[i+1], succ); }
+        else { this._merge(n, i); this._delete(n.children[i], val); }
       }
     } else {
       if (n.leaf) { this._steps.push({ type: 'info', desc: `${val} not found`, highlight: [], kind: 'info' }); return; }
       this._steps.push({ type: 'visit', desc: `Descending to child ${i}`, highlight: [n.id], kind: 'path' });
       if (n.children[i].keys.length < t) this._fill(n, i);
-      if (i > n.keys.length) this._delete(n.children[i - 1], val);
-      else                   this._delete(n.children[i],     val);
+      if (i > n.keys.length) this._delete(n.children[i-1], val);
+      else                   this._delete(n.children[i],   val);
     }
   }
 
-  _getPred(n) { while (!n.leaf) n = n.children[n.children.length - 1]; return n.keys[n.keys.length - 1]; }
+  _getPred(n) { while (!n.leaf) n = n.children[n.children.length-1]; return n.keys[n.keys.length-1]; }
   _getSucc(n) { while (!n.leaf) n = n.children[0]; return n.keys[0]; }
   _fill(n, i) {}
 
   _merge(n, i) {
-    let child = n.children[i], sib = n.children[i + 1];
+    let child = n.children[i], sib = n.children[i+1];
     child.keys.push(n.keys[i]);
     child.keys = child.keys.concat(sib.keys);
     child.children = child.children.concat(sib.children);
-    n.keys.splice(i, 1); n.children.splice(i + 1, 1);
+    n.keys.splice(i, 1); n.children.splice(i+1, 1);
     this._steps.push({ type: 'merge', desc: `Merged children at index ${i}`, highlight: [child.id], kind: 'rotate' });
   }
 
   search(val) {
     let steps = [{ type: 'info', desc: `Searching for ${val} in B-Tree`, highlight: [], kind: 'info' }];
-    this._search(this.root, val, steps);
-    return steps;
+    this._search(this.root, val, steps); return steps;
   }
 
   _search(n, val, steps) {
@@ -947,9 +940,7 @@ class BTree {
     steps.push({ type: 'visit', desc: `Checking node [${n.keys.join(', ')}]`, highlight: [n.id], kind: 'path' });
     let i = 0;
     while (i < n.keys.length && val > n.keys[i]) i++;
-    if (i < n.keys.length && n.keys[i] === val) {
-      steps.push({ type: 'found', desc: `Found ${val}!`, highlight: [n.id], kind: 'found' }); return;
-    }
+    if (i < n.keys.length && n.keys[i] === val) { steps.push({ type: 'found', desc: `Found ${val}!`, highlight: [n.id], kind: 'found' }); return; }
     if (n.leaf) { steps.push({ type: 'info', desc: `${val} not found`, highlight: [], kind: 'info' }); return; }
     this._search(n.children[i], val, steps);
   }
@@ -963,9 +954,6 @@ class BTree {
 // ============================================================
 let trees = { avl: new AVLTree(), rb: new RBTree(), btree: new BTree(2) };
 
-// ============================================================
-// HELPERS — get CSS variable values at runtime
-// ============================================================
 function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
@@ -975,9 +963,7 @@ function cssVar(name) {
 // ============================================================
 const svg = d3.select('#tree-svg');
 let g = svg.append('g');
-
 let defs = svg.append('defs');
-
 let zoom = d3.zoom().scaleExtent([0.1, 4]).on('zoom', e => g.attr('transform', e.transform));
 svg.call(zoom);
 
@@ -1004,7 +990,6 @@ function nodeToD3_btree(n) {
   return obj;
 }
 
-// ── Color map for highlight kinds ──
 function highlightFill(kind) {
   const map = {
     new:       cssVar('--node-new'),
@@ -1019,108 +1004,62 @@ function highlightFill(kind) {
   return map[kind] || cssVar('--accent2');
 }
 
-// ── Build gradient defs ──
 function buildGradients() {
   defs.selectAll('*').remove();
 
+  // AVL / BTree normal node gradient
   let ng = defs.append('radialGradient')
-    .attr('id', 'grad-node-normal')
-    .attr('cx', '35%').attr('cy', '30%').attr('r', '65%');
+    .attr('id', 'grad-node-normal').attr('cx', '35%').attr('cy', '30%').attr('r', '65%');
   ng.append('stop').attr('offset', '0%')  .attr('stop-color', cssVar('--node-fill-a')).attr('stop-opacity', 1);
   ng.append('stop').attr('offset', '100%').attr('stop-color', cssVar('--bg2'))         .attr('stop-opacity', 1);
 
-  let hg = defs.append('radialGradient')
-    .attr('id', 'grad-node-hl')
-    .attr('cx', '35%').attr('cy', '30%').attr('r', '65%');
-  hg.append('stop').attr('offset', '0%')  .attr('stop-color', '#fff').attr('stop-opacity', 0.9);
-  hg.append('stop').attr('offset', '100%').attr('stop-color', cssVar('--accent')).attr('stop-opacity', 1);
-
-  let rg = defs.append('radialGradient')
-    .attr('id', 'grad-rb-red')
-    .attr('cx', '35%').attr('cy', '30%').attr('r', '65%');
-  rg.append('stop').attr('offset', '0%')  .attr('stop-color', '#b91c1c').attr('stop-opacity', 1);
-  rg.append('stop').attr('offset', '100%').attr('stop-color', cssVar('--node-rb-red')).attr('stop-opacity', 1);
-
-  let bg = defs.append('radialGradient')
-    .attr('id', 'grad-rb-black')
-    .attr('cx', '35%').attr('cy', '30%').attr('r', '65%');
-  bg.append('stop').attr('offset', '0%')  .attr('stop-color', '#374151').attr('stop-opacity', 1);
-  bg.append('stop').attr('offset', '100%').attr('stop-color', cssVar('--node-rb-blk')).attr('stop-opacity', 1);
-
-  const kinds = ['new','path','found','delete','rotate','recolor'];
-  kinds.forEach(kind => {
+  // Highlight gradients for AVL/BTree
+  ['new','path','found','delete','rotate','recolor'].forEach(kind => {
     let c = highlightFill(kind);
     let kg = defs.append('radialGradient')
-      .attr('id', `grad-hl-${kind}`)
-      .attr('cx', '35%').attr('cy', '30%').attr('r', '65%');
-    kg.append('stop').attr('offset', '0%')  .attr('stop-color', '#fff').attr('stop-opacity', 0.6);
+      .attr('id', `grad-hl-${kind}`).attr('cx', '35%').attr('cy', '30%').attr('r', '65%');
+    kg.append('stop').attr('offset', '0%')  .attr('stop-color', '#fff').attr('stop-opacity', 0.55);
     kg.append('stop').attr('offset', '100%').attr('stop-color', c)      .attr('stop-opacity', 1);
   });
 
+  // Subtle glow filter (AVL/BTree only)
   let filter = defs.append('filter').attr('id', 'glow').attr('x', '-50%').attr('y', '-50%').attr('width', '200%').attr('height', '200%');
-  filter.append('feGaussianBlur').attr('stdDeviation', '4').attr('result', 'coloredBlur');
+  filter.append('feGaussianBlur').attr('stdDeviation', '3').attr('result', 'coloredBlur');
   let feMerge = filter.append('feMerge');
   feMerge.append('feMergeNode').attr('in', 'coloredBlur');
   feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
-
-  let linkFilter = defs.append('filter').attr('id', 'link-glow');
-  linkFilter.append('feGaussianBlur').attr('stdDeviation', '2').attr('result', 'blur');
-  let lm = linkFilter.append('feMerge');
-  lm.append('feMergeNode').attr('in', 'blur');
-  lm.append('feMergeNode').attr('in', 'SourceGraphic');
 }
 
-// ── Fit tree to viewport ──
-// Called after first insert and after panel open/close
 function fitTreeToView() {
   const tree = trees[currentTree];
   const data = treeToD3(tree);
   if (!data) return;
-
   const svgEl = document.getElementById('tree-svg');
-  const W = svgEl.clientWidth;
-  const H = svgEl.clientHeight;
+  const W = svgEl.clientWidth, H = svgEl.clientHeight;
   if (!W || !H) return;
-
-  // Get current bounding box of the tree group
   const gEl = svgEl.querySelector('g');
   if (!gEl) return;
-
   try {
     const bbox = gEl.getBBox();
     if (!bbox.width || !bbox.height) return;
-
-    const scale = Math.min(
-      0.85 * W / bbox.width,
-      0.85 * H / bbox.height,
-      2.0
-    );
-
+    const scale = Math.min(0.85 * W / bbox.width, 0.85 * H / bbox.height, 2.0);
     const tx = W / 2 - scale * (bbox.x + bbox.width / 2);
     const ty = H / 2 - scale * (bbox.y + bbox.height / 2);
-
-    svg.transition().duration(300).call(
-      zoom.transform,
-      d3.zoomIdentity.translate(tx, ty).scale(scale)
-    );
+    svg.transition().duration(300).call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
   } catch(e) {}
 }
 
-// ── Main render ──
 let isFirstRender = true;
 
 function render(highlights = new Map()) {
   buildGradients();
-
   let tree = trees[currentTree];
   let data = treeToD3(tree);
   g.selectAll('*').remove();
 
   if (!data) {
     document.getElementById('empty-state').style.display = 'block';
-    isFirstRender = true;
-    updateMetrics();
-    return;
+    isFirstRender = true; updateMetrics(); return;
   }
   document.getElementById('empty-state').style.display = 'none';
 
@@ -1130,167 +1069,142 @@ function render(highlights = new Map()) {
     .separation((a, b) => a.parent === b.parent ? 1.4 : 2.0);
   treeLayout(hierarchy);
 
-  // ── Links ──
-  g.selectAll('path.link')
-    .data(hierarchy.links())
-    .enter().append('path')
+  // Links
+  g.selectAll('path.link').data(hierarchy.links()).enter().append('path')
     .attr('class', 'link')
     .attr('d', d => {
       let sx = d.source.x, sy = d.source.y, tx = d.target.x, ty = d.target.y;
-      return `M${sx},${sy} C${sx},${(sy + ty) / 2} ${tx},${(sy + ty) / 2} ${tx},${ty}`;
+      return `M${sx},${sy} C${sx},${(sy+ty)/2} ${tx},${(sy+ty)/2} ${tx},${ty}`;
     })
     .attr('stroke', cssVar('--border-h'))
-    .attr('stroke-width', 2)
-    .attr('stroke-linecap', 'round')
-    .attr('fill', 'none')
-    .attr('opacity', 0.6);
+    .attr('stroke-width', 2).attr('stroke-linecap', 'round')
+    .attr('fill', 'none').attr('opacity', 0.6);
 
-  // ── Nodes ──
-  let node = g.selectAll('g.node')
-    .data(hierarchy.descendants())
-    .enter().append('g')
-    .attr('class', 'node node-group')
+  // Nodes
+  let node = g.selectAll('g.node').data(hierarchy.descendants()).enter()
+    .append('g').attr('class', 'node node-group')
     .attr('transform', d => `translate(${d.x},${d.y})`)
     .style('cursor', 'pointer')
     .on('mouseover', function(e, d) {
       let tip = document.getElementById('node-tooltip');
       tip.style.display = 'block';
-      tip.style.left = (e.pageX + 14) + 'px';
-      tip.style.top  = (e.pageY - 14) + 'px';
+      tip.style.left = (e.pageX + 14) + 'px'; tip.style.top = (e.pageY - 14) + 'px';
       if      (currentTree === 'avl')   tip.innerHTML = `<b>${d.data.val}</b> &nbsp;·&nbsp; BF: <span style="color:${Math.abs(d.data.bf)>1?cssVar('--node-del'):cssVar('--accent2')}">${d.data.bf}</span>`;
-      else if (currentTree === 'rb')    tip.innerHTML = `<b>${d.data.val}</b> &nbsp;·&nbsp; <span style="color:${d.data.rbColor==='red'?cssVar('--node-del'):cssVar('--text-muted')}">${d.data.rbColor}</span>`;
+      else if (currentTree === 'rb')    tip.innerHTML = `<b>${d.data.val}</b> &nbsp;·&nbsp; <span style="color:${d.data.rbColor==='red'?'#ef4444':cssVar('--text-muted')}">${d.data.rbColor}</span>`;
       else                              tip.innerHTML = `Keys: <b>[${d.data.keys?.join(', ')}]</b>`;
     })
     .on('mousemove', function(e) {
       let tip = document.getElementById('node-tooltip');
-      tip.style.left = (e.pageX + 14) + 'px';
-      tip.style.top  = (e.pageY - 14) + 'px';
+      tip.style.left = (e.pageX + 14) + 'px'; tip.style.top = (e.pageY - 14) + 'px';
     })
     .on('mouseout', () => { document.getElementById('node-tooltip').style.display = 'none'; });
 
   node.each(function(d) {
-    let el          = d3.select(this);
-    let id          = d.data.id;
-    let isHL        = highlights.has(id);
-    let hlKind      = isHL ? highlights.get(id) : null;
-    let hlColor     = isHL ? highlightFill(hlKind) : null;
+    let el    = d3.select(this);
+    let id    = d.data.id;
+    let isHL  = highlights.has(id);
+    let hlKind = isHL ? highlights.get(id) : null;
+    let hlColor = isHL ? highlightFill(hlKind) : null;
 
     if (currentTree === 'btree') {
       let keys = d.data.keys || [d.data.val];
       let w = Math.max(keys.length * 34 + 10, 44), h = 32;
-
       el.append('rect')
-        .attr('x', -w/2).attr('y', -h/2)
-        .attr('width', w).attr('height', h)
-        .attr('rx', 8)
+        .attr('x', -w/2).attr('y', -h/2).attr('width', w).attr('height', h).attr('rx', 8)
         .attr('fill',   isHL ? `url(#grad-hl-${hlKind})` : `url(#grad-node-normal)`)
         .attr('stroke', isHL ? hlColor : cssVar('--border-h'))
         .attr('stroke-width', isHL ? 2 : 1)
-        .attr('filter',  isHL ? 'url(#glow)' : null);
-
+        .attr('filter', isHL ? 'url(#glow)' : null);
       keys.forEach((k, i) => {
-        let x = -w/2 + i * 34 + 17;
-        el.append('text')
-          .attr('x', x).attr('y', 5)
-          .attr('text-anchor', 'middle')
+        let x = -w/2 + i*34 + 17;
+        el.append('text').attr('x', x).attr('y', 5).attr('text-anchor', 'middle')
           .attr('fill', isHL ? '#111' : cssVar('--text'))
-          .attr('font-size', 13).attr('font-weight', 600)
-          .attr('font-family', 'JetBrains Mono, monospace')
-          .text(k);
+          .attr('font-size', 13).attr('font-weight', 600).attr('font-family', 'JetBrains Mono, monospace').text(k);
         if (i < keys.length - 1)
-          el.append('line')
-            .attr('x1', x+17).attr('y1', -h/2)
-            .attr('x2', x+17).attr('y2', h/2)
+          el.append('line').attr('x1', x+17).attr('y1', -h/2).attr('x2', x+17).attr('y2', h/2)
             .attr('stroke', cssVar('--border')).attr('stroke-width', 1);
       });
 
-    } else {
-      let R = 22;
-      let fillId, strokeColor;
+    } else if (currentTree === 'rb') {
+      // ── Simplified RB node rendering — flat, clean colors ──
+      const R = 22;
+      const isRed = d.data.rbColor === 'red';
 
+      // Base fill colors (flat, no heavy gradients)
+      const baseFill   = isRed  ? '#c0392b' : '#2c3e50';
+      const baseStroke = isRed  ? '#e74c3c' : '#4a5568';
+      const hlFill     = isHL   ? hlColor   : baseFill;
+      const hlStroke   = isHL   ? hlColor   : baseStroke;
+
+      // Highlight ring — only on highlighted nodes
       if (isHL) {
-        fillId      = `url(#grad-hl-${hlKind})`;
-        strokeColor = hlColor;
-      } else if (currentTree === 'rb') {
-        fillId      = d.data.rbColor === RED ? 'url(#grad-rb-red)' : 'url(#grad-rb-black)';
-        strokeColor = d.data.rbColor === RED ? '#ef4444' : '#374151';
-      } else {
-        fillId      = 'url(#grad-node-normal)';
-        strokeColor = cssVar('--border-h');
+        el.append('circle').attr('r', R + 7)
+          .attr('fill', 'none').attr('stroke', hlColor)
+          .attr('stroke-width', 2).attr('stroke-dasharray', '4 3')
+          .attr('opacity', 0.6)
+          .attr('class', 'rb-hl-ring');
       }
 
-      if (isHL) {
-        el.append('circle')
-          .attr('r', R + 6)
-          .attr('fill', 'none')
-          .attr('stroke', hlColor)
-          .attr('stroke-width', 1.5)
-          .attr('opacity', 0.35);
-      }
+      // Main circle — simple flat fill
+      el.append('circle').attr('r', R)
+        .attr('fill',   hlFill)
+        .attr('stroke', hlStroke)
+        .attr('stroke-width', isHL ? 2.5 : 1.8)
+        .attr('class', 'rb-node-circle');
 
-      el.append('circle')
-        .attr('r', R)
-        .attr('fill', fillId)
-        .attr('stroke', strokeColor)
-        .attr('stroke-width', isHL ? 2 : 1.5)
-        .attr('filter', isHL ? 'url(#glow)' : null);
+      // Subtle top-left shine (very light)
+      el.append('circle').attr('r', 7).attr('cx', -7).attr('cy', -8)
+        .attr('fill', '#fff').attr('opacity', 0.08);
 
-      el.append('circle')
-        .attr('r', 6)
-        .attr('cx', -7).attr('cy', -8)
-        .attr('fill', '#fff')
-        .attr('opacity', 0.12);
-
-      el.append('text')
-        .attr('dy', 5)
-        .attr('text-anchor', 'middle')
-        .attr('fill', isHL ? '#111' : cssVar('--text'))
-        .attr('font-size', 13)
-        .attr('font-weight', 700)
+      // Value label
+      el.append('text').attr('dy', 5).attr('text-anchor', 'middle')
+        .attr('fill', '#ffffff')
+        .attr('font-size', 13).attr('font-weight', 700)
         .attr('font-family', 'JetBrains Mono, monospace')
         .text(d.data.val);
 
-      if (currentTree === 'avl') {
-        let bf   = d.data.bf;
-        let bfColor = bf === 0
-          ? cssVar('--text-muted')
-          : (Math.abs(bf) > 1 ? cssVar('--node-del') : cssVar('--accent4'));
+      // Small color dot indicator below node
+      el.append('circle').attr('r', 4).attr('cy', R + 9)
+        .attr('fill', isRed ? '#e74c3c' : '#718096').attr('opacity', 0.85);
 
-        el.append('rect')
-          .attr('x', R - 5).attr('y', -R - 6)
-          .attr('width', 20).attr('height', 14)
-          .attr('rx', 4)
-          .attr('fill', cssVar('--bg'))
-          .attr('stroke', bfColor)
-          .attr('stroke-width', 1)
-          .attr('opacity', 0.9);
+    } else {
+      // AVL
+      let R = 22;
+      let fillId      = isHL ? `url(#grad-hl-${hlKind})` : 'url(#grad-node-normal)';
+      let strokeColor = isHL ? hlColor : cssVar('--border-h');
 
-        el.append('text')
-          .attr('x', R + 5).attr('y', -R + 4)
-          .attr('text-anchor', 'middle')
-          .attr('fill', bfColor)
-          .attr('font-size', 9)
-          .attr('font-weight', 700)
-          .attr('font-family', 'JetBrains Mono, monospace')
-          .text(bf);
+      if (isHL) {
+        el.append('circle').attr('r', R + 6)
+          .attr('fill', 'none').attr('stroke', hlColor)
+          .attr('stroke-width', 1.5).attr('opacity', 0.3);
       }
 
-      if (currentTree === 'rb') {
-        el.append('circle')
-          .attr('r', 4)
-          .attr('cy', R + 8)
-          .attr('fill', d.data.rbColor === RED ? '#ef4444' : '#6b7280')
-          .attr('opacity', 0.8);
-      }
+      el.append('circle').attr('r', R)
+        .attr('fill', fillId).attr('stroke', strokeColor)
+        .attr('stroke-width', isHL ? 2 : 1.5)
+        .attr('filter', isHL ? 'url(#glow)' : null);
+
+      el.append('circle').attr('r', 6).attr('cx', -7).attr('cy', -8)
+        .attr('fill', '#fff').attr('opacity', 0.12);
+
+      el.append('text').attr('dy', 5).attr('text-anchor', 'middle')
+        .attr('fill', isHL ? '#111' : cssVar('--text'))
+        .attr('font-size', 13).attr('font-weight', 700)
+        .attr('font-family', 'JetBrains Mono, monospace').text(d.data.val);
+
+      // BF badge
+      let bf = d.data.bf;
+      let bfColor = bf === 0 ? cssVar('--text-muted') : (Math.abs(bf) > 1 ? cssVar('--node-del') : cssVar('--accent4'));
+      el.append('rect').attr('x', R-5).attr('y', -R-6).attr('width', 20).attr('height', 14)
+        .attr('rx', 4).attr('fill', cssVar('--bg')).attr('stroke', bfColor)
+        .attr('stroke-width', 1).attr('opacity', 0.9);
+      el.append('text').attr('x', R+5).attr('y', -R+4).attr('text-anchor', 'middle')
+        .attr('fill', bfColor).attr('font-size', 9).attr('font-weight', 700)
+        .attr('font-family', 'JetBrains Mono, monospace').text(bf);
     }
   });
 
-  // Auto-fit on first render of a new node
-  if (isFirstRender) {
-    isFirstRender = false;
-    setTimeout(() => fitTreeToView(), 50);
-  }
-
+  if (isFirstRender) { isFirstRender = false; setTimeout(() => fitTreeToView(), 50); }
   updateMetrics();
 }
 
@@ -1305,6 +1219,7 @@ function doInsert() {
   addLog(`Insert ${v}`, 'insert');
   document.getElementById('val-input').value = '';
   queueSteps(steps);
+  autoSnapshot('Insert', v);  // setTimeout olmadan direkt çağır
 }
 
 function doDelete() {
@@ -1315,6 +1230,7 @@ function doDelete() {
   addLog(`Delete ${v}`, 'delete');
   document.getElementById('val-input').value = '';
   queueSteps(steps);
+  autoSnapshot('Delete', v);  // setTimeout olmadan direkt çağır
 }
 
 function doSearch() {
@@ -1329,13 +1245,9 @@ function doSearch() {
 
 function clearTree() {
   trees[currentTree] = currentTree === 'avl' ? new AVLTree() : currentTree === 'rb' ? new RBTree() : new BTree(2);
-  stepQueue = []; stepIndex = 0; isPlaying = false;
-  clearInterval(playTimer);
-  metrics = { rotations: 0, ops: 0 };
-  isFirstRender = true;
-  render(new Map());
-  updateStepIndicator();
-  hideStepOverlay();
+  stepQueue = []; stepIndex = 0; isPlaying = false; clearInterval(playTimer);
+  metrics = { rotations: 0, ops: 0 }; isFirstRender = true;
+  render(new Map()); updateStepIndicator(); hideStepOverlay();
   document.getElementById('traversal-result').style.display = 'none';
   addLog('Tree cleared', 'info');
 }
@@ -1343,8 +1255,7 @@ function clearTree() {
 function insertSequence(vals) {
   clearTree();
   for (let v of vals) { trees[currentTree].insert(v); metrics.ops++; }
-  isFirstRender = true;
-  render(new Map());
+  isFirstRender = true; render(new Map());
   addLog(`Inserted: [${vals.join(', ')}]`, 'insert');
   setTimeout(() => fitTreeToView(), 80);
 }
@@ -1354,12 +1265,9 @@ function insertRandom(n) {
   let vals = [];
   for (let i = 0; i < n; i++) {
     let v = Math.floor(Math.random() * 99) + 1;
-    vals.push(v);
-    trees[currentTree].insert(v);
-    metrics.ops++;
+    vals.push(v); trees[currentTree].insert(v); metrics.ops++;
   }
-  isFirstRender = true;
-  render(new Map());
+  isFirstRender = true; render(new Map());
   addLog(`Random: [${vals.join(', ')}]`, 'insert');
   setTimeout(() => fitTreeToView(), 80);
 }
@@ -1373,7 +1281,7 @@ function traversalSteps(order) {
   steps.push({ type: 'info', desc: `${order} traversal starting…`, highlight: [], kind: 'info' });
 
   if (currentTree === 'btree') {
-    function btInorder(n)  {
+    function btInorder(n) {
       if (!n) return;
       n.keys.forEach((k, i) => {
         if (n.children[i]) btInorder(n.children[i]);
@@ -1409,9 +1317,9 @@ function traversalSteps(order) {
     else                            btLevel(tree.root);
   } else {
     let root = tree.root;
-    function inorder(n)  { if (!n) return; inorder(n.left); sequence.push({id:n.id,val:n.val}); steps.push({type:'visit',desc:`Visit ${n.val}`,highlight:[n.id],kind:'path'}); inorder(n.right); }
-    function preorder(n) { if (!n) return; sequence.push({id:n.id,val:n.val}); steps.push({type:'visit',desc:`Visit ${n.val}`,highlight:[n.id],kind:'path'}); preorder(n.left); preorder(n.right); }
-    function postorder(n){ if (!n) return; postorder(n.left); postorder(n.right); sequence.push({id:n.id,val:n.val}); steps.push({type:'visit',desc:`Visit ${n.val}`,highlight:[n.id],kind:'path'}); }
+    function inorder(n)   { if (!n) return; inorder(n.left); sequence.push({id:n.id,val:n.val}); steps.push({type:'visit',desc:`Visit ${n.val}`,highlight:[n.id],kind:'path'}); inorder(n.right); }
+    function preorder(n)  { if (!n) return; sequence.push({id:n.id,val:n.val}); steps.push({type:'visit',desc:`Visit ${n.val}`,highlight:[n.id],kind:'path'}); preorder(n.left); preorder(n.right); }
+    function postorder(n) { if (!n) return; postorder(n.left); postorder(n.right); sequence.push({id:n.id,val:n.val}); steps.push({type:'visit',desc:`Visit ${n.val}`,highlight:[n.id],kind:'path'}); }
     function levelorder(root) {
       if (!root) return;
       let q = [root];
@@ -1419,8 +1327,7 @@ function traversalSteps(order) {
         let n = q.shift();
         sequence.push({id:n.id,val:n.val});
         steps.push({type:'visit',desc:`Visit ${n.val} (BFS)`,highlight:[n.id],kind:'path'});
-        if (n.left)  q.push(n.left);
-        if (n.right) q.push(n.right);
+        if (n.left) q.push(n.left); if (n.right) q.push(n.right);
       }
     }
     if      (order === 'inorder')   inorder(root);
@@ -1439,13 +1346,11 @@ function doTraversal(order) {
   if (!tree.root) { addLog('Tree is empty', 'info'); return; }
   metrics.ops++;
   let { steps, vals } = traversalSteps(order);
-
   let box = document.getElementById('traversal-result');
   const names = { inorder:'Inorder (L→N→R)', preorder:'Preorder (N→L→R)', postorder:'Postorder (L→R→N)', levelorder:'Level-order (BFS)' };
   document.getElementById('traversal-label').textContent = names[order] || order;
   document.getElementById('traversal-vals').textContent  = vals.join(' → ');
   box.style.display = 'block';
-
   addLog(`${order}: [${vals.join(', ')}]`, 'search');
   queueSteps(steps);
 }
@@ -1454,25 +1359,19 @@ function doTraversal(order) {
 // STEP SYSTEM
 // ============================================================
 function queueSteps(steps) {
-  stopPlay();
-  stepQueue = steps; stepIndex = -1;
+  stopPlay(); stepQueue = steps; stepIndex = -1;
   updateStepIndicator();
-  if (steps.length > 1) togglePlay();
-  else stepForward();
+  if (steps.length > 1) togglePlay(); else stepForward();
 }
 
 function stepForward() {
   if (stepIndex >= stepQueue.length - 1) { stopPlay(); hideStepOverlay(); render(new Map()); return; }
-  stepIndex++;
-  applyStep(stepQueue[stepIndex]);
-  updateStepIndicator();
+  stepIndex++; applyStep(stepQueue[stepIndex]); updateStepIndicator();
 }
 
 function stepBack() {
   if (stepIndex <= 0) return;
-  stepIndex--;
-  applyStep(stepQueue[stepIndex]);
-  updateStepIndicator();
+  stepIndex--; applyStep(stepQueue[stepIndex]); updateStepIndicator();
 }
 
 function applyStep(step) {
@@ -1482,29 +1381,20 @@ function applyStep(step) {
   render(hlMap);
   showStepOverlay(step);
   logStep(step);
-  // Sync pseudo-code
-  if (activeRightPanel === 'pseudo') {
-    highlightPseudoLines(step.kind || 'info');
-  }
+  if (activeRightPanel === 'pseudo') highlightPseudoLines(step.kind || 'info');
 }
 
 function showStepOverlay(step) {
   let overlay = document.getElementById('step-overlay');
-  let typeEl  = document.getElementById('step-type');
-  let descEl  = document.getElementById('step-desc');
   const labels = { insert:'Insert', delete:'Delete', rotate:'Rotation', search:'Search', visit:'Traversal', found:'Found!', recolor:'Recolor', split:'Split', merge:'Merge', info:'Info' };
-  typeEl.textContent = labels[step.type] || step.type;
-  descEl.textContent = step.desc || '';
-  overlay.className  = 'step-overlay show';
+  document.getElementById('step-type').textContent = labels[step.type] || step.type;
+  document.getElementById('step-desc').textContent = step.desc || '';
+  overlay.className = 'step-overlay show';
 }
 
-function hideStepOverlay() {
-  document.getElementById('step-overlay').className = 'step-overlay';
-}
+function hideStepOverlay() { document.getElementById('step-overlay').className = 'step-overlay'; }
 
-function togglePlay() {
-  if (isPlaying) stopPlay(); else startPlay();
-}
+function togglePlay() { if (isPlaying) stopPlay(); else startPlay(); }
 
 function startPlay() {
   if (stepIndex >= stepQueue.length - 1) stepIndex = -1;
@@ -1567,31 +1457,25 @@ function logStep(step) {
 function switchTree(type) {
   currentTree = type;
   document.querySelectorAll('.tree-tab').forEach((t, i) => {
-    t.classList.toggle('active', ['avl', 'rb', 'btree'][i] === type);
+    t.classList.toggle('active', ['avl','rb','btree'][i] === type);
   });
   stopPlay(); stepQueue = []; stepIndex = 0;
-  metrics = { rotations: 0, ops: 0 };
-  isFirstRender = true;
-  updateStepIndicator();
-  hideStepOverlay();
-  render(new Map());
-  updateLegend();
+  metrics = { rotations: 0, ops: 0 }; isFirstRender = true;
+  updateStepIndicator(); hideStepOverlay(); render(new Map()); updateLegend();
   document.getElementById('traversal-result').style.display = 'none';
   addLog(`Switched to ${type === 'avl' ? 'AVL Tree' : type === 'rb' ? 'Red-Black Tree' : 'B-Tree'}`, 'info');
-  if (activeRightPanel === 'pseudo') {
-    currentHighlightedLines = new Set();
-    renderPseudoCode(type);
-  }
+  if (activeRightPanel === 'pseudo') { currentHighlightedLines = new Set(); renderPseudoCode(type); }
+  if (activeRightPanel === 'bigo') renderBigO(type);
 }
 
 function updateLegend() {
   let leg = document.getElementById('legend');
   if (currentTree === 'rb') {
     leg.innerHTML = `
-      <div class="legend-item"><div class="legend-dot" style="background:#ef4444;color:#ef4444"></div>Red node</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#6b7280;color:#6b7280"></div>Black node</div>
-      <div class="legend-item"><div class="legend-dot" style="background:var(--node-rot);color:var(--node-rot)"></div>Rotation</div>
-      <div class="legend-item"><div class="legend-dot" style="background:var(--node-rcol);color:var(--node-rcol)"></div>Recolor</div>`;
+      <div class="legend-item"><div class="legend-dot" style="background:#c0392b;color:#c0392b"></div>Red node</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#2c3e50;color:#718096;border:1px solid #718096"></div>Black node</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--node-path);color:var(--node-path)"></div>Search path</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--node-found);color:var(--node-found)"></div>Found</div>`;
   } else {
     leg.innerHTML = `
       <div class="legend-item"><div class="legend-dot" style="background:var(--node-new);color:var(--node-new)"></div>New node</div>
@@ -1616,11 +1500,245 @@ document.getElementById('val-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') doInsert();
 });
 
-// Close modal on overlay click
 document.getElementById('auth-modal').addEventListener('click', function(e) {
   if (e.target === this) closeAuthModal();
 });
 
+// ============================================================
+// HISTORY SYSTEM
+// ============================================================
+let treeHistory = JSON.parse(localStorage.getItem('tv-tree-history') || '[]');
+let currentSnapshotId = null;
+
+function serializeTree() {
+  const tree = trees[currentTree];
+  if (currentTree === 'avl') {
+    return { nodes: collectAVL(tree.root) };
+  } else if (currentTree === 'rb') {
+    return { nodes: collectRB(tree.root) };
+  } else {
+    return { nodes: collectBTree(tree.root) };
+  }
+}
+
+function collectAVL(n) {
+  if (!n) return [];
+  return [n.val, ...collectAVL(n.left), ...collectAVL(n.right)];
+}
+
+function collectRB(n) {
+  if (!n) return [];
+  return [n.val, ...collectRB(n.left), ...collectRB(n.right)];
+}
+
+function collectBTree(n) {
+  if (!n) return [];
+  let vals = [...n.keys];
+  n.children.forEach(c => vals.push(...collectBTree(c)));
+  return vals;
+}
+
+function saveSnapshot(label) {
+  const tree = trees[currentTree];
+  if (tree.size() === 0) { showToast('Kaydedilecek ağaç yok!'); return; }
+
+  const inorderVals = getInorderVals();
+  const snap = {
+    id: 'snap_' + Date.now(),
+    treeType: currentTree,
+    label: label || `${currentTree.toUpperCase()} — ${tree.size()} node`,
+    timestamp: Date.now(),
+    size: tree.size(),
+    height: tree.getHeight(),
+    rotations: metrics.rotations,
+    ops: metrics.ops,
+    inorder: inorderVals,
+    insertOrder: serializeTree().nodes,
+  };
+
+  treeHistory.unshift(snap);
+  if (treeHistory.length > 20) treeHistory = treeHistory.slice(0, 20);
+  localStorage.setItem('tv-tree-history', JSON.stringify(treeHistory));
+  currentSnapshotId = snap.id;
+  renderHistoryPanel();
+  showToast('✓ Snapshot kaydedildi');
+  addLog(`Snapshot kaydedildi: "${snap.label}"`, 'insert');
+}
+
+function autoSnapshot(opName, val) {
+  const tree = trees[currentTree];
+
+  // Inorder değerleri al
+  const vals = [];
+  if (currentTree === 'avl' || currentTree === 'rb') {
+    function inorder(n) { if (!n) return; inorder(n.left); vals.push(n.val); inorder(n.right); }
+    inorder(tree.root);
+  } else {
+    function btInorder(n) {
+      if (!n) return;
+      n.keys.forEach((k, i) => { if (n.children[i]) btInorder(n.children[i]); vals.push(k); });
+      if (n.children[n.keys.length]) btInorder(n.children[n.keys.length]);
+    }
+    btInorder(tree.root);
+  }
+
+  if (vals.length === 0) return;
+
+  // Insert sırasını da kaydet (inorder zaten sıralı, biz preorder lazım)
+  const insertOrder = [];
+  if (currentTree === 'avl' || currentTree === 'rb') {
+    function preorder(n) { if (!n) return; insertOrder.push(n.val); preorder(n.left); preorder(n.right); }
+    preorder(tree.root);
+  } else {
+    insertOrder.push(...vals);
+  }
+
+  const snap = {
+    id: 'snap_' + Date.now() + '_' + Math.random().toString(36).substr(2,4),
+    treeType: currentTree,
+    label: `${opName}(${val}) → ${currentTree.toUpperCase()}`,
+    timestamp: Date.now(),
+    size: tree.size(),
+    height: tree.getHeight(),
+    rotations: metrics.rotations,
+    ops: metrics.ops,
+    inorder: vals,
+    insertOrder: insertOrder,
+    auto: true,
+  };
+
+  treeHistory.unshift(snap);
+  if (treeHistory.length > 20) treeHistory = treeHistory.slice(0, 20);
+  localStorage.setItem('tv-tree-history', JSON.stringify(treeHistory));
+
+  if (activeRightPanel === 'history') renderHistoryPanel();
+}
+
+function getInorderVals() {
+  const tree = trees[currentTree];
+  const vals = [];
+  if (currentTree === 'avl' || currentTree === 'rb') {
+    function inorder(n) { if (!n) return; inorder(n.left); vals.push(n.val); inorder(n.right); }
+    inorder(tree.root);
+  } else {
+    function btInorder(n) {
+      if (!n) return;
+      n.keys.forEach((k, i) => { if (n.children[i]) btInorder(n.children[i]); vals.push(k); });
+      if (n.children[n.keys.length]) btInorder(n.children[n.keys.length]);
+    }
+    btInorder(tree.root);
+  }
+  return vals;
+}
+
+function restoreSnapshot(snapId) {
+  const snap = treeHistory.find(s => s.id === snapId);
+  if (!snap) return;
+
+  // Önce tree tipini değiştir ve temizle
+  currentTree = snap.treeType;
+  trees = { avl: new AVLTree(), rb: new RBTree(), btree: new BTree(2) };
+  document.querySelectorAll('.tree-tab').forEach((t, i) => {
+    t.classList.toggle('active', ['avl','rb','btree'][i] === snap.treeType);
+  });
+
+  // Preorder sırasıyla ekle (ağaç yapısını korur)
+  const vals = snap.insertOrder || snap.inorder || [];
+  vals.forEach(v => trees[snap.treeType].insert(v));
+
+  metrics.rotations = snap.rotations || 0;
+  metrics.ops = snap.ops || 0;
+  stepQueue = []; stepIndex = 0; isPlaying = false;
+  clearInterval(playTimer);
+  isFirstRender = true;
+
+  updateStepIndicator();
+  hideStepOverlay();
+  document.getElementById('traversal-result').style.display = 'none';
+  updateLegend();
+  render(new Map());
+  currentSnapshotId = snapId;
+  renderHistoryPanel();
+  setTimeout(() => fitTreeToView(), 80);
+  showToast(`✓ "${snap.label}" geri yüklendi`);
+  addLog(`Snapshot geri yüklendi: "${snap.label}"`, 'traversal');
+}
+
+function deleteSnapshot(snapId) {
+  treeHistory = treeHistory.filter(s => s.id !== snapId);
+  localStorage.setItem('tv-tree-history', JSON.stringify(treeHistory));
+  if (currentSnapshotId === snapId) currentSnapshotId = null;
+  renderHistoryPanel();
+}
+
+function clearAllHistory() {
+  if (!confirm('Tüm geçmiş silinsin mi?')) return;
+  treeHistory = [];
+  localStorage.removeItem('tv-tree-history');
+  currentSnapshotId = null;
+  renderHistoryPanel();
+  addLog('Tüm geçmiş temizlendi', 'info');
+}
+
+function renderHistoryPanel() {
+  const area = document.getElementById('history-area');
+  if (!area) return;
+
+  if (treeHistory.length === 0) {
+    area.innerHTML = `
+      <div class="history-empty">
+        <div class="history-empty-icon">🕰️</div>
+        <div class="history-empty-text">Henüz snapshot yok.<br>İşlem yaptıktan sonra otomatik kaydedilir<br>veya manuel kaydet butonunu kullanın.</div>
+      </div>`;
+    const cnt = document.getElementById('history-count');
+    if (cnt) cnt.textContent = '0 snapshot';
+    return;
+  }
+
+  const cnt = document.getElementById('history-count');
+  if (cnt) cnt.textContent = `${treeHistory.length} / 20 snapshot`;
+
+  area.innerHTML = treeHistory.map(snap => {
+    const isActive = snap.id === currentSnapshotId;
+    const date = new Date(snap.timestamp);
+    const timeStr = date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const dateStr = date.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' });
+    const inorderPreview = (snap.inorder || []).slice(0, 10).join(', ') + ((snap.inorder||[]).length > 10 ? '…' : '');
+    const badgeClass = snap.treeType;
+    const badgeLabel = snap.treeType === 'avl' ? 'AVL' : snap.treeType === 'rb' ? 'RB' : 'B';
+
+    return `
+      <div class="history-card ${isActive ? 'active-snapshot' : ''}" id="hcard-${snap.id}">
+        <div class="history-card-header">
+          <div class="history-card-title">
+            <span class="history-tree-badge ${badgeClass}">${badgeLabel}</span>
+            ${snap.auto ? '🔄' : '📌'} ${snap.label}
+          </div>
+          <div class="history-card-time">${dateStr} ${timeStr}</div>
+        </div>
+        <div class="history-card-meta">
+          <div class="history-meta-item">Nodes: <span>${snap.size}</span></div>
+          <div class="history-meta-item">Height: <span>${snap.height}</span></div>
+          <div class="history-meta-item">Rot: <span>${snap.rotations}</span></div>
+        </div>
+        ${inorderPreview ? `<div class="history-card-vals">↕ ${inorderPreview}</div>` : ''}
+        <div class="history-card-actions">
+          <button class="history-action-btn restore" onclick="restoreSnapshot('${snap.id}')">⏮ Geri Yükle</button>
+          <button class="history-action-btn danger" onclick="deleteSnapshot('${snap.id}')">🗑</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function showToast(msg) {
+  const existing = document.querySelector('.history-restore-toast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.className = 'history-restore-toast';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2100);
+}
 // ── Init ──
 initAuth();
 render(new Map());

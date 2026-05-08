@@ -218,10 +218,18 @@
         <span>📋</span>
         <span class="tab-label">Pseudo</span>
       </button>
+      <button class="right-tab-btn" id="rtab-bigo" onclick="toggleRightPanel('bigo')" title="Big O Complexity">
+  <span>📊</span>
+  <span class="tab-label">Big O</span>
+</button>
       <button class="right-tab-btn" id="rtab-chat" onclick="toggleRightPanel('chat')" title="Sohbet Geçmişi">
         <span>💬</span>
         <span class="tab-label">Sohbet</span>
       </button>
+      <button class="right-tab-btn" id="rtab-history" onclick="toggleRightPanel('history')" title="Tree History">
+  <span>🕰️</span>
+  <span class="tab-label">History</span>
+</button>
     </div>
 
     <!-- Panel Content -->
@@ -243,6 +251,18 @@
             <!-- Complexities injected by JS -->
           </div>
         </div>
+        <!-- Big O Panel -->
+<div class="bigo-panel" id="bigo-panel">
+  <div class="panel-header">
+    <div class="panel-title">
+      📊 Big O
+      <span class="panel-badge" id="bigo-tree-badge">Complexity</span>
+    </div>
+  </div>
+  <div class="bigo-scroll" id="bigo-area">
+    <!-- Injected by JS -->
+  </div>
+</div>
 
         <!-- Chat Panel -->
         <div class="chat-panel" id="chat-panel">
@@ -251,6 +271,23 @@
               💬 Sohbet Geçmişi
             </div>
           </div>
+          <!-- History Panel -->
+<div class="history-panel" id="history-panel">
+  <div class="panel-header">
+    <div class="panel-title">
+      🕰️ Tree History
+      <span class="panel-badge">Snapshots</span>
+    </div>
+  </div>
+  <div class="history-toolbar">
+    <button class="history-toolbar-btn save-now" onclick="saveSnapshot()">📌 Kaydet</button>
+    <button class="history-toolbar-btn clear-all" onclick="clearAllHistory()">🗑 Temizle</button>
+  </div>
+  <div class="history-count" id="history-count">0 snapshot</div>
+  <div class="history-scroll" id="history-area">
+    <!-- Injected by JS -->
+  </div>
+</div>
 
           <!-- Auth wall (shown when not logged in) -->
           <div class="chat-auth-wall" id="chat-auth-wall">
