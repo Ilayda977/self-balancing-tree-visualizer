@@ -556,6 +556,37 @@ function highlightPseudoLines(stepKind) {
 }
 
 // ============================================================
+// AVL SERIALIZE / DESERIALIZE  (snapshot helpers)
+// ============================================================
+function serializeAVL(node) {
+  if (!node) return null;
+  return {
+    val:    node.val,
+    height: node.height,
+    bf:     node.bf,
+    id:     node.id,
+    left:   serializeAVL(node.left),
+    right:  serializeAVL(node.right)
+  };
+}
+
+function deserializeAVL(data) {
+  if (!data) return null;
+  let node   = new AVLNode(data.val);
+  node.height = data.height;
+  node.bf     = data.bf;
+  node.id     = data.id;
+  node.left   = deserializeAVL(data.left);
+  node.right  = deserializeAVL(data.right);
+  return node;
+}
+
+// ── Stub for history log called from demoRotation ──
+function addToHistoryLog(type, label) {
+  addLog(label, type);
+}
+
+// ============================================================
 // STATE
 // ============================================================
 let currentTree = 'avl';
@@ -746,15 +777,38 @@ insert(val){
 
     return steps;
 }
-  delete(val) {
-  let steps = [{ type: 'info', desc: `Deleting ${val} from AVL Tree`, highlight: [], kind: 'info' }];
-  let found = { hit: false };
-  this.root = this._delete(this.root, val, steps, found);
-  if (!found.hit) {
-    steps.push({ type: 'info', desc: `${val} not found in tree`, highlight: [], kind: 'info' });
+  _delete(n, val, steps, found) {
+    if (!n) return null;
+    steps.push({ type: 'visit', desc: `Visiting ${n.val}`, highlight: [n.id], kind: 'path' });
+    if (val < n.val) {
+      n.left = this._delete(n.left, val, steps, found);
+    } else if (val > n.val) {
+      n.right = this._delete(n.right, val, steps, found);
+    } else {
+      found.hit = true;
+      steps.push({ type: 'delete', desc: `Deleting ${val}`, highlight: [n.id], kind: 'delete' });
+      if (!n.left) return n.right;
+      if (!n.right) return n.left;
+      // Find inorder successor (min of right subtree)
+      let successor = n.right;
+      while (successor.left) successor = successor.left;
+      steps.push({ type: 'info', desc: `Replacing with inorder successor ${successor.val}`, highlight: [successor.id], kind: 'path' });
+      n.val = successor.val;
+      n.right = this._delete(n.right, successor.val, steps, { hit: false });
+    }
+    this.update(n);
+    return this.balance(n, steps);
   }
-  return steps;
-}
+
+  delete(val) {
+    let steps = [{ type: 'info', desc: `Deleting ${val} from AVL Tree`, highlight: [], kind: 'info' }];
+    let found = { hit: false };
+    this.root = this._delete(this.root, val, steps, found);
+    if (!found.hit) {
+      steps.push({ type: 'info', desc: `${val} not found in tree`, highlight: [], kind: 'info' });
+    }
+    return steps;
+  }
   _search(n, val, steps) {
     if (!n) { steps.push({ type: 'info', desc: `${val} not found`, highlight: [], kind: 'info' }); return; }
     steps.push({ type: 'visit', desc: `Visiting ${n.val}`, highlight: [n.id], kind: 'path' });
